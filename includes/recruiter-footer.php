@@ -1,2 +1,4 @@
 </div>
-<?php require __DIR__ . '/footer.php'; ?>
+<script src="<?= e(asset_url('js/script.js')) ?>"></script>
+</body>
+</html>

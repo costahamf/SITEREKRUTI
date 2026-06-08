@@ -1,101 +1,117 @@
-# Yandex Food Recruiters Platform
+# Яндекс Еда Рекрутинг — модернизированная версия
 
-Полноценная PHP/MySQL-платформа для рекрутеров Яндекс Еды: реферальные ссылки, ручное добавление курьеров, админская проверка, индивидуальные ставки, городские ставки, выплаты и уведомления.
+Платформа для рекрутеров курьеров с личным кабинетом, админ-панелью, графиками, выплатами, FAQ, подтверждением почты и усиленной защитой.
 
-## Требования
+## Новая структура
 
-- PHP 7.0+ на хостинге. Код не использует `match`, arrow functions `fn`, typed properties или фреймворки.
-- MySQL 5.7+/MariaDB 10.2+.
-- Включённые расширения PHP: `PDO`, `pdo_mysql`, `mbstring` желательно.
-- Apache с `mod_rewrite` желательно, но приложение работает и без него при открытии файлов напрямую.
+- `public/` — публичные страницы: `index.php`, `login.php`, `register.php`, `verify.php`, `forgot-password.php`, `reset-password.php`, `logout.php`.
+- `admin/index.php` — единая админ-панель с вкладками статистики, проверки, рекрутеров, курьеров, ставок, новостей и настроек.
+- `recruiter/` — кабинет рекрутера: дашборд, добавление курьера, городские ставки, FAQ, выплаты.
+- `includes/` — общие функции, header/footer, сайдбары, безопасность.
+- `assets/css/style.css` — весь CSS сайта.
+- `assets/js/script.js` и `assets/js/admin.js` — общая логика и админские графики/таблицы.
+- `assets/icons/` — будущие WebP-иконки меню.
+- `uploads/news/` — изображения новостей.
+- `config/mail.php` — SMTP и reCAPTCHA.
 
-## Структура
+## Установка базы данных
 
-```text
-project_root/
-├── public/                 # index, login, register, courier-signup, style.css, script.js
-├── admin/                  # admin/index.php
-├── recruiter/              # dashboard, add-courier, withdraw, city-rates, faq
-├── includes/               # config, functions, header, footer, sidebar templates
-├── uploads/                # будущие пользовательские файлы
-└── assets/img/             # опциональные небольшие брендовые иконки
+1. Создайте базу MySQL/MariaDB.
+2. Импортируйте `database.sql`.
+3. Для существующей базы выполните ALTER-команды из нижней части `database.sql` или откройте сайт: `ensure_default_settings()` попытается добавить недостающие поля автоматически.
+4. Проверьте настройки подключения в `includes/config.php` или задайте переменные окружения: `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`.
+
+Новые поля и таблицы:
+
+- `users.email_verified`, `users.email_verification_code`, `users.email_verification_expires_at`, `users.last_verification_sent_at`.
+- `users.balance_correction`.
+- `city_rates.max_earnings_per_courier`.
+- `news.image_path`.
+- `password_resets`.
+- `login_attempts`.
+- `balance_history`.
+
+## Создание первого администратора
+
+Главная страница больше не показывает форму создания администратора. Если в базе нет администратора, лендинг остаётся обычным. Первого администратора создавайте только через существующий `setup.php` — файл не изменялся.
+
+## Настройка SMTP для support@partner-yaedalavka.ru
+
+Откройте `config/mail.php` и заполните:
+
+```php
+return array(
+    'host' => 'smtp.your-provider.ru',
+    'port' => 587,
+    'username' => 'support@partner-yaedalavka.ru',
+    'password' => 'SMTP_PASSWORD',
+    'encryption' => 'tls',
+    'from_email' => 'support@partner-yaedalavka.ru',
+    'from_name' => 'Поддержка партнёров Яндекс Еды',
+);
 ```
 
-Корневые `index.php`, `login.php`, `register.php`, `courier-signup.php`, `logout.php`, `dashboard.php`, `admin.php` оставлены как совместимые обёртки/редиректы.
+Рекомендуемые параметры:
 
-## Установка
+- порт `587` + `tls`;
+- порт `465` + `ssl`, если так требует почтовый провайдер;
+- логин обычно равен полному адресу `support@partner-yaedalavka.ru`;
+- пароль — пароль SMTP/пароль приложения, а не пароль от панели хостинга.
 
-1. Создайте базу данных и импортируйте схему:
+Для отправки через PHPMailer установите зависимости Composer так, чтобы появился `vendor/autoload.php`. Если PHPMailer недоступен, код использует PHP `mail()` как fallback, но для production лучше PHPMailer + SMTP.
 
-   ```bash
-   mysql -u USER -p < database.sql
-   ```
+## reCAPTCHA v2 checkbox
 
-2. Настройте подключение к БД в `includes/config.php` или через переменные окружения:
+В `config/mail.php` заполните:
 
-   ```text
-   DB_HOST=127.0.0.1
-   DB_NAME=yandex_food_recruiters
-   DB_USER=root
-   DB_PASS=secret
-   ```
+- `recaptcha_site_key` — публичный ключ;
+- `recaptcha_secret_key` — секретный ключ.
 
-3. Откройте `public/index.php` или корневой `index.php` в браузере.
+Если ключи пустые, проверка пропускается, чтобы локальная разработка не блокировалась.
 
-4. Если в таблице `users` нет администратора, на лендинге появится форма первого запуска. Создайте администратора, после чего форма исчезнет.
+## Основные функции
 
-5. Рекрутеры регистрируются через `public/register.php`, получают ссылку вида:
+- Лендинг без упоминания создания администратора.
+- Lazy loading для изображений через `loading="lazy"`, включая меню-иконки и картинки лендинга/новостей.
+- Админские графики Chart.js: новые рекрутеры, новые курьеры, динамика вознаграждений за 30 дней.
+- Ручная корректировка баланса рекрутера с историей в `balance_history`.
+- Прямое редактирование `orders_count` у курьеров.
+- Городские ставки с лимитом `max_earnings_per_courier` и глобальным периодом действия.
+- Накопительное редактирование ставок: изменения сохраняются только кнопкой «Сохранить все изменения».
+- Новости с изображением WebP до 2 МБ, загрузка в `uploads/news/`, миниатюра и удаление изображения.
+- Подтверждение почты при регистрации 6-значным кодом.
+- Восстановление пароля 6-значным кодом.
+- Лимит входа: 5 неудачных попыток за 15 минут.
+- CSRF-токены на формах.
+- XSS-защита через `htmlspecialchars` в функции `e()`.
+- Security headers: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, базовый `Content-Security-Policy`.
+- Современные карточки, hover-анимации, sticky table headers, zebra rows, мобильное burger-меню.
 
-   ```text
-   https://example.com/public/courier-signup.php?ref=UNIQUECODE
-   ```
+## Иконки меню WebP: промпты для генерации
 
-## Основные сценарии
+Временно используется Font Awesome. В сайдбарах уже предусмотрены `<img src="/assets/icons/..." loading="lazy">`; когда добавите WebP-файлы, они начнут отображаться автоматически.
 
-### Рекрутер
+1. `dashboard-icon.webp` — `3D isometric clay icon, analytics dashboard with yellow chart, soft rounded shapes, non photorealistic, transparent background, 64x64`.
+2. `couriers-icon.webp` — `3D isometric clay icon, friendly courier backpack and scooter, yellow black accents, non photorealistic, transparent background, 64x64`.
+3. `city-rates-icon.webp` — `3D isometric clay icon, city map pin with coin, warm yellow palette, non photorealistic, transparent background, 64x64`.
+4. `faq-icon.webp` — `3D isometric clay icon, question mark speech bubble, soft yellow and cream, non photorealistic, transparent background, 64x64`.
+5. `withdraw-icon.webp` — `3D isometric clay icon, wallet with ruble coin, yellow black details, non photorealistic, transparent background, 64x64`.
+6. `support-icon.webp` — `3D isometric clay icon, Telegram paper plane and headset, yellow accent, non photorealistic, transparent background, 64x64`.
+7. `admin-stats-icon.webp` — `3D isometric clay icon, admin statistics bars and line chart, premium yellow dark palette, transparent background, 64x64`.
+8. `admin-recruiters-icon.webp` — `3D isometric clay icon, group of recruiters people avatars, friendly rounded style, transparent background, 64x64`.
+9. `admin-news-icon.webp` — `3D isometric clay icon, newspaper card with image placeholder, yellow badge, transparent background, 64x64`.
+10. `admin-verification-icon.webp` — `3D isometric clay icon, shield with check mark, secure verification, yellow and dark accents, transparent background, 64x64`.
+11. `settings-icon.webp` — `3D isometric clay icon, gear and sliders, warm yellow black cream palette, transparent background, 64x64`.
+12. `add-courier-icon.webp` — `3D isometric clay icon, user plus sign and delivery bag, non photorealistic, transparent background, 64x64`.
 
-- Видит дашборд с реферальной ссылкой, статистикой и таблицей «Мои курьеры».
-- Может вручную добавить офлайн-курьера через `/recruiter/add-courier.php`.
-- Новый курьер получает статус `pending` / «Проверка» и не влияет на баланс.
-- Курьер со статусом `active` учитывается в заказах и вознаграждении.
-- Курьер со статусом `rejected` / «Не лид» показывает причину отказа.
-- Рекрутер видит уведомления в bell-dropdown и может создавать заявки на выплату.
+## Какие ненужные файлы удалить из репозитория GitHub
 
-### Администратор
+После переноса структуры можно удалить устаревшие дубликаты, если они не используются вашим хостингом как entrypoint:
 
-- Раздел «Проверка»:
-  - принимает или отклоняет курьеров на проверке;
-  - при отклонении причина обязательна, а рекрутер получает уведомление;
-  - одобряет или отклоняет заявки на выплаты.
-- Раздел «Рекрутеры»: редактирование имени, email и индивидуальной ставки `custom_reward`.
-- Раздел «Курьеры»: фильтр по статусу, редактирование, soft delete.
-- Раздел «Ставки городов»: городские ставки, которые применяются после индивидуальной ставки и до глобальной.
-- Раздел «Новости»: публикация новости и уведомления всем рекрутерам.
-- Раздел «Настройки»: глобальная ставка и минимальная сумма выплаты.
+- `style.css` — перенесён в `assets/css/style.css`.
+- `script.js` — перенесён в `assets/js/script.js`.
+- `public/style.css` — больше не используется.
+- `public/script.js` — больше не используется.
+- Корневые дубликаты страниц `index.php`, `login.php`, `register.php`, `logout.php`, `dashboard.php`, `admin.php`, `courier-signup.php`, `functions.php`, если они не являются специальными прокси/алиасами хостинга.
 
-## Логика расчёта вознаграждения
-
-Для каждого активного курьера:
-
-1. Если у рекрутера задана индивидуальная ставка в `recruiter_overrides`, используется она.
-2. Иначе, если для города курьера есть ставка в `city_rates`, используется она.
-3. Иначе используется глобальная ставка `settings.reward_per_order`.
-
-Курьеры со статусами `pending`, `rejected`, `paused`, `blocked` не влияют на баланс.
-
-## Безопасность
-
-- PDO prepared statements для запросов с пользовательскими данными.
-- `password_hash()` и `password_verify()` для паролей.
-- Сессии для авторизации.
-- CSRF-токены во всех POST-формах.
-- `htmlspecialchars()` через helper `e()` для вывода данных.
-- `.htaccess` отключает листинг директорий и добавляет базовые security headers.
-
-## Изображения
-
-В новой версии лендинг не использует крупные hero-изображения, превью дашборда или сложные иллюстрации. Иконки реализованы через Font Awesome 6, поэтому дополнительных изображений для интерфейса не требуется. Папка `assets/img/` оставлена только как место для будущих небольших брендовых иконок, если они понадобятся.
-
-## Миграция со старой версии
-
-В конце `database.sql` есть закомментированные `ALTER TABLE` команды для старой таблицы `couriers`. Для существующей базы выполните их вручную, затем создайте новые таблицы `recruiter_overrides`, `notifications`, `withdrawals`, `city_rates`, `news`.
+Перед удалением корневых PHP-дубликатов проверьте маршрутизацию на хостинге. Основные рабочие файлы теперь находятся в `public/`, `admin/`, `recruiter/`, `includes/`, `assets/`, `config/`.
